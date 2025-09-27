@@ -1,0 +1,41 @@
+# LDAP Configuration Example
+# Copy this to application.yml and configure according to your LDAP server
+
+ovsx:
+  ldap:
+    # LDAP server URL
+    url: ldap://192.168.1.125:389
+    # Base DN for LDAP searches
+    base: dc=teknolojikpanda,dc=com,dc=tr
+    # User DN for binding (optional, for authenticated bind)
+    userDn: cn=admin,dc=teknolojikpanda,dc=com,dc=tr
+    # Password for binding (optional, for authenticated bind)
+    password: dn9rvf7rzJjQRbAGU48p
+    # Base DN for user searches (e.g., ou=users or ou=people)
+    userSearchBase: ou=users
+    # LDAP filter for user searches
+    # For Active Directory: (sAMAccountName={0})
+    # For OpenLDAP: (uid={0})
+    userSearchFilter: (uid={0})
+
+# Example configurations for different LDAP servers:
+
+# Active Directory Example:
+# ovsx:
+#   ldap:
+#     url: ldap://ad.company.com:389
+#     base: dc=company,dc=com
+#     userDn: cn=service-account,ou=service-accounts,dc=company,dc=com
+#     password: service_password
+#     userSearchBase: ou=users,dc=company,dc=com
+#     userSearchFilter: (sAMAccountName={0})
+
+# OpenLDAP Example:
+# ovsx:
+#   ldap:
+#     url: ldap://openldap.company.com:389
+#     base: dc=company,dc=com
+#     userDn: cn=admin,dc=company,dc=com
+#     password: admin_password
+#     userSearchBase: ou=people,dc=company,dc=com
+#     userSearchFilter: (uid={0})
