@@ -24,9 +24,7 @@ import org.eclipse.openvsx.eclipse.TokenService;
 import org.eclipse.openvsx.entities.*;
 import org.eclipse.openvsx.publish.ExtensionVersionIntegrityService;
 import org.eclipse.openvsx.repositories.RepositoryService;
-import org.eclipse.openvsx.search.ExtensionSearch;
-import org.eclipse.openvsx.search.ISearchService;
-import org.eclipse.openvsx.search.SearchUtilService;
+import org.eclipse.openvsx.search.*;
 import org.eclipse.openvsx.security.OAuth2AttributesConfig;
 import org.eclipse.openvsx.security.OAuth2UserServices;
 import org.eclipse.openvsx.security.SecurityConfig;
@@ -40,15 +38,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.client.AutoConfigureWebClient;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.elasticsearch.core.SearchHit;
-import org.springframework.data.elasticsearch.core.SearchHitsImpl;
-import org.springframework.data.elasticsearch.core.TotalHitsRelation;
 import org.springframework.data.util.Streamable;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -72,24 +67,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(VSCodeAPI.class)
 @AutoConfigureWebClient
-@MockBean({
+@MockitoBean( types = {
     ClientRegistrationRepository.class, GoogleCloudStorageService.class, AzureBlobStorageService.class,
     AwsStorageService.class, AzureDownloadCountService.class, CacheService.class, UpstreamVSCodeService.class,
-    VSCodeIdService.class, EntityManager.class, EclipseService.class, ExtensionValidator.class, SimpleMeterRegistry.class,
+    VSCodeIdService.class, EclipseService.class, ExtensionValidator.class, SimpleMeterRegistry.class,
     FileCacheDurationConfig.class
 })
 class VSCodeAPITest {
 
-    @MockBean
+    @MockitoBean
     EntityManager entityManager;
 
-    @MockBean
+    @MockitoBean
     RepositoryService repositories;
 
-    @MockBean
+    @MockitoBean
     SearchUtilService search;
 
-    @MockBean
+    @MockitoBean
     ExtensionVersionIntegrityService integrityService;
 
     @Autowired
@@ -629,19 +624,18 @@ class VSCodeAPITest {
         var builtInExtensionNamespace = "vscode";
         var entry1 = new ExtensionSearch();
         entry1.setId(1);
-        List<SearchHit<ExtensionSearch>> searchResults = !builtInExtensionNamespace.equals(namespaceName)
-                ? Collections.singletonList(new SearchHit<>("0", "1", null, 1.0f, null, null, null, null, null, null, entry1))
+        List<ExtensionSearch> searchHits = !builtInExtensionNamespace.equals(namespaceName)
+                ? Collections.singletonList(entry1)
                 : Collections.emptyList();
-        var searchHits = new SearchHitsImpl<>(searchResults.size(), TotalHitsRelation.EQUAL_TO, 1.0f, "1", null,
-                searchResults, null, null, null);
+        var searchResult = new SearchResult(searchHits.size(), searchHits);
 
         Mockito.when(integrityService.isEnabled())
                 .thenReturn(true);
         Mockito.when(search.isEnabled())
                 .thenReturn(true);
-        var searchOptions = new ISearchService.Options("yaml", null, targetPlatform, 50, 0, "desc", "relevance", false, new String[]{builtInExtensionNamespace});
+        var searchOptions = new ISearchService.Options("yaml", null, targetPlatform, 50, 0, "desc", SortBy.RELEVANCE, false, new String[]{builtInExtensionNamespace});
         Mockito.when(search.search(searchOptions))
-                .thenReturn(searchHits);
+                .thenReturn(searchResult);
 
         var extension = mockExtension();
         List<Extension> results = active ? List.of(extension) : Collections.emptyList();

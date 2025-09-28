@@ -27,9 +27,7 @@ import org.eclipse.openvsx.publish.ExtensionVersionIntegrityService;
 import org.eclipse.openvsx.publish.PublishExtensionVersionHandler;
 import org.eclipse.openvsx.publish.PublishExtensionVersionService;
 import org.eclipse.openvsx.repositories.RepositoryService;
-import org.eclipse.openvsx.search.ExtensionSearch;
-import org.eclipse.openvsx.search.ISearchService;
-import org.eclipse.openvsx.search.SearchUtilService;
+import org.eclipse.openvsx.search.*;
 import org.eclipse.openvsx.security.OAuth2AttributesConfig;
 import org.eclipse.openvsx.security.OAuth2UserServices;
 import org.eclipse.openvsx.security.SecurityConfig;
@@ -47,19 +45,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.client.AutoConfigureWebClient;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.elasticsearch.core.SearchHit;
-import org.springframework.data.elasticsearch.core.SearchHitsImpl;
-import org.springframework.data.elasticsearch.core.TotalHitsRelation;
 import org.springframework.data.util.Streamable;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -87,7 +82,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(RegistryAPI.class)
 @AutoConfigureWebClient
-@MockBean({
+@MockitoBean(types = {
     ClientRegistrationRepository.class, UpstreamRegistryService.class, GoogleCloudStorageService.class,
     AzureBlobStorageService.class, AwsStorageService.class, VSCodeIdService.class, AzureDownloadCountService.class,
     CacheService.class, EclipseService.class, PublishExtensionVersionService.class, SimpleMeterRegistry.class,
@@ -95,19 +90,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class RegistryAPITest {
 
-    @SpyBean
+    @MockitoSpyBean
     UserService users;
 
-    @MockBean
+    @MockitoBean
     RepositoryService repositories;
 
-    @MockBean
+    @MockitoBean
     SearchUtilService search;
 
-    @MockBean
+    @MockitoBean
     ExtensionVersionIntegrityService integrityService;
 
-    @MockBean
+    @MockitoBean
     EntityManager entityManager;
 
     @Autowired
@@ -2183,13 +2178,12 @@ class RegistryAPITest {
         extension.setId(1L);
         var entry1 = new ExtensionSearch();
         entry1.setId(1);
-        var searchHit = new SearchHit<>("0", "1", null, 1.0f, null, null, null, null, null, null, entry1);
-        var searchHits = new SearchHitsImpl<>(1, TotalHitsRelation.EQUAL_TO, 1.0f, "1", null, List.of(searchHit), null, null, null);
         Mockito.when(search.isEnabled())
                 .thenReturn(true);
-        var searchOptions = new ISearchService.Options("foo", null, null, 10, 0, "desc", "relevance", false, null);
+        var searchResult = new SearchResult(1, List.of(entry1));
+        var searchOptions = new ISearchService.Options("foo", null, null, 10, 0, "desc", SortBy.RELEVANCE, false, null);
         Mockito.when(search.search(searchOptions))
-                .thenReturn(searchHits);
+                .thenReturn(searchResult);
         return List.of(extVersion);
     }
 
@@ -2387,6 +2381,19 @@ class RegistryAPITest {
         @Bean
         TransactionTemplate transactionTemplate() {
             return new MockTransactionTemplate();
+        }
+
+        @Bean
+        UserService userService(
+                EntityManager entityManager,
+                RepositoryService repositories,
+                StorageUtilService storageUtil,
+                CacheService cache,
+                ExtensionValidator validator,
+                @Autowired(required = false) ClientRegistrationRepository clientRegistrationRepository,
+                OAuth2AttributesConfig attributesConfig
+        ) {
+            return new UserService(entityManager, repositories, storageUtil, cache, validator, clientRegistrationRepository, attributesConfig);
         }
 
         @Bean

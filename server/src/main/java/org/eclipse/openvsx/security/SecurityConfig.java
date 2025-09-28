@@ -29,7 +29,7 @@ import org.springframework.security.ldap.search.FilterBasedLdapUserSearch;
 import org.springframework.security.ldap.userdetails.LdapAuthoritiesPopulator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.Http403ForbiddenEntryPoint;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import jakarta.annotation.PostConstruct;
@@ -87,13 +87,13 @@ public class SecurityConfig {
                 registry -> registry
                         .requestMatchers(antMatchers("/*", "/login/**", "/oauth2/**", "/login-providers", "/user", "/user/auth-error", "/logout", "/ldap-test", "/actuator/health/**", "/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus", "/v3/api-docs/**", "/swagger-resources/**", "/swagger-ui/**", "/webjars/**"))
                             .permitAll()
-                        .requestMatchers(antMatchers("/api/*/*/review", "/api/*/*/review/delete", "/api/user/publish", "/api/user/namespace/create"))
+                        .requestMatchers(pathMatchers("/api/*/*/review", "/api/*/*/review/delete", "/api/user/publish", "/api/user/namespace/create"))
                             .authenticated()
-                        .requestMatchers(antMatchers("/api/**", "/vscode/**", "/documents/**", "/admin/api/**", "/admin/report"))
+                        .requestMatchers(pathMatchers("/api/**", "/vscode/**", "/documents/**", "/admin/api/**", "/admin/report"))
                             .permitAll()
-                        .requestMatchers(antMatchers("/admin/**"))
+                        .requestMatchers(pathMatchers("/admin/**"))
                             .hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(antMatchers(frontendRoutes))
+                        .requestMatchers(pathMatchers(frontendRoutes))
                             .permitAll()
                         .anyRequest()
                             .authenticated()
@@ -195,11 +195,11 @@ public class SecurityConfig {
 
     private RequestMatcher[] antMatchers(String... patterns)
     {
-        var antMatchers = new RequestMatcher[patterns.length];
+        var pathMatchers = new RequestMatcher[patterns.length];
         for(var i = 0; i < patterns.length; i++) {
-            antMatchers[i] = AntPathRequestMatcher.antMatcher(patterns[i]);
+            pathMatchers[i] = PathPatternRequestMatcher.withDefaults().matcher(patterns[i]);
         }
 
-        return antMatchers;
+        return pathMatchers;
     }
 }
