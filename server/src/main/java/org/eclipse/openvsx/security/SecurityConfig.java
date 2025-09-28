@@ -14,6 +14,7 @@ import java.util.Collection;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -75,7 +76,10 @@ public class SecurityConfig {
     private final org.eclipse.openvsx.UserService userService;
     private final org.springframework.ldap.core.LdapTemplate ldapTemplate;
 
-    public SecurityConfig(LdapConfig ldapConfig, LdapUserService ldapUserService, org.eclipse.openvsx.UserService userService, org.springframework.ldap.core.LdapTemplate ldapTemplate) {
+    public SecurityConfig(@Autowired(required = false) LdapConfig ldapConfig, 
+                         @Autowired(required = false) LdapUserService ldapUserService, 
+                         org.eclipse.openvsx.UserService userService, 
+                         @Autowired(required = false) org.springframework.ldap.core.LdapTemplate ldapTemplate) {
         this.ldapConfig = ldapConfig;
         this.ldapUserService = ldapUserService;
         this.userService = userService;
@@ -120,7 +124,7 @@ public class SecurityConfig {
                 .csrf(configurer -> configurer.ignoringRequestMatchers(toMatchers("/api/-/publish", "/api/-/namespace/create", "/api/-/query", "/vscode/**", "/admin/api/**", "/login")))
                 .exceptionHandling(configurer -> configurer.authenticationEntryPoint(new Http403ForbiddenEntryPoint()));
 
-        if (ldapConfig.isLdapEnabled()) {
+        if (ldapConfig != null && ldapConfig.isLdapEnabled()) {
             configureLdapAuth(filterChain);
         }
         if (userServices.canLogin()) {
@@ -131,6 +135,11 @@ public class SecurityConfig {
     }
 
     private void configureLdapAuth(HttpSecurity http) throws Exception {
+        if (ldapTemplate == null || ldapUserService == null) {
+            logger.warn("LDAP dependencies not available, skipping LDAP authentication configuration");
+            return;
+        }
+        
         String redirectUrl = getRedirectUrl();
         http.formLogin(configurer -> {
             configurer.loginPage("/login")

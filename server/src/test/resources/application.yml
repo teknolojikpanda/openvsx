@@ -44,3 +44,7 @@ ovsx:
   storage:
     local:
       directory: /tmp
+  elasticsearch:
+    enabled: false
+  databasesearch:
+    enabled: true

@@ -140,6 +140,7 @@ class CacheServiceTest {
             var poster = new UserData();
             poster.setLoginName("user1");
             entityManager.persist(poster);
+            entityManager.flush();
             setLoggedInUser(poster);
 
             var review = new ReviewJson();
@@ -148,6 +149,7 @@ class CacheServiceTest {
             review.setTimestamp("2000-01-01T10:00Z");
 
             registry.postReview(review, namespace.getName(), extension.getName());
+            entityManager.flush();
             assertNull(cache.getCache(CACHE_EXTENSION_JSON).get(cacheKey, ExtensionJson.class));
 
             json = registry.getExtension(namespace.getName(), extension.getName(), extVersion.getTargetPlatform(), extVersion.getVersion());
@@ -173,6 +175,7 @@ class CacheServiceTest {
             var poster = new UserData();
             poster.setLoginName("user1");
             entityManager.persist(poster);
+            entityManager.flush();
             setLoggedInUser(poster);
 
             var review = new ReviewJson();
@@ -181,11 +184,13 @@ class CacheServiceTest {
             review.setTimestamp("2000-01-01T10:00Z");
 
             registry.postReview(review, namespace.getName(), extension.getName());
+            entityManager.flush();
             var json = registry.getExtension(namespace.getName(), extension.getName(), extVersion.getTargetPlatform(), extVersion.getVersion());
             assertEquals(Long.valueOf(1), json.getReviewCount());
             assertEquals(Double.valueOf(3), json.getAverageRating());
 
             registry.deleteReview(namespace.getName(), extension.getName());
+            entityManager.flush();
             assertNull(cache.getCache(CACHE_EXTENSION_JSON).get(cacheKey, ExtensionJson.class));
 
             json = registry.getExtension(namespace.getName(), extension.getName(), extVersion.getTargetPlatform(), extVersion.getVersion());
@@ -231,12 +236,14 @@ class CacheServiceTest {
             var newVersion = "0.2.0";
             var oldVersion = extVersion.getVersion();
             try (var newTempFile = insertNewVersion(extension, extVersion.getPublishedWith(), newVersion)) {
+                entityManager.flush();
 
                 var json = registry.getExtension(namespace.getName(), extension.getName(), extVersion.getTargetPlatform(), newVersion);
                 assertTrue(json.getAllVersions().containsKey(newVersion));
                 assertTrue(json.getAllVersions().containsKey(oldVersion));
 
                 admins.deleteExtension(namespace.getName(), extension.getName(), extVersion.getTargetPlatform(), newVersion, admin);
+                entityManager.flush();
                 assertNull(cache.getCache(CACHE_EXTENSION_JSON).get(cacheKey, ExtensionJson.class));
 
                 json = registry.getExtension(namespace.getName(), extension.getName(), extVersion.getTargetPlatform(), extVersion.getVersion());
@@ -266,7 +273,9 @@ class CacheServiceTest {
             var oldVersion = extVersion.getVersion();
             try (var newTempFile = insertNewVersion(extension, extVersion.getPublishedWith(), newVersion)) {
                 newTempFile.getResource().getExtension().setPreRelease(true);
+                entityManager.flush();
                 extensions.updateExtension(extension);
+                entityManager.flush();
                 assertNull(cache.getCache(CACHE_EXTENSION_JSON).get(cacheKey, ExtensionJson.class));
 
                 var json = registry.getExtension(namespace.getName(), extension.getName(), extVersion.getTargetPlatform(), oldVersion);

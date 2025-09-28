@@ -9,23 +9,26 @@
  ********************************************************************************/
 package org.eclipse.openvsx;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.data.elasticsearch.client.ClientConfiguration;
-import org.springframework.data.elasticsearch.client.elc.ElasticsearchConfiguration;
-import org.testcontainers.elasticsearch.ElasticsearchContainer;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.mockito.Mockito;
 
 @Configuration
 @Profile("test")
-public class TestSearchConfig extends ElasticsearchConfiguration {
+public class TestSearchConfig {
 
-    @Override
-    public ClientConfiguration clientConfiguration() {
-        var container = new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch:8.7.1")
-                .withEnv("discovery.type", "single-node")
-                .withEnv("xpack.security.enabled", "false");
-
-        container.start();
-        return ClientConfiguration.create(container.getHttpHostAddress());
+    @Bean
+    public ElasticsearchOperations elasticsearchOperations() {
+        ElasticsearchOperations mock = Mockito.mock(ElasticsearchOperations.class);
+        IndexOperations indexOps = Mockito.mock(IndexOperations.class);
+        
+        Mockito.when(mock.indexOps(Mockito.any(Class.class))).thenReturn(indexOps);
+        Mockito.when(indexOps.exists()).thenReturn(false);
+        Mockito.when(indexOps.create()).thenReturn(true);
+        
+        return mock;
     }
 }
