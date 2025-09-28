@@ -42,13 +42,13 @@ export const LoginComponent: FunctionComponent<LoginComponentProps> = ({ loginPr
                             </div>
                         )}
                         {hasLdap && (
-                            <LdapLoginForm 
-                                csrfToken={csrfToken} 
+                            <LdapLoginForm
+                                csrfToken={csrfToken}
                                 onSuccess={onSuccess}
                             />
                         )}
                         {oauth.map(p => (
-                            <Button key={p} href={loginProviders[p]} fullWidth variant="contained">
+                            <Button key={p} href={loginProviders[p]} fullWidth variant='contained'>
                                 Login with {p}
                             </Button>
                         ))}

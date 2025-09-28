@@ -29,13 +29,15 @@ export const LdapLoginForm: React.FC<Props> = ({ csrfToken, onSuccess }) => {
         if (csrfToken) formData.append('_csrf', csrfToken);
 
         try {
-            const url = (process as any).env.REACT_APP_SERVER_URL || window.location.origin;
+            const url = window.location.origin;
             const res = await fetch(`${url}/login`, {
                 method: 'POST',
                 credentials: 'include',
                 body: formData,
             });
-            const payload = await res.json().catch(() => { throw new Error('Invalid JSON'); });
+            const payload = await res.json().catch(() => {
+                throw new Error('Invalid JSON');
+            });
             if (!res.ok || !payload.success) {
                 throw new Error(payload.error || 'Login failed');
             }
@@ -52,25 +54,25 @@ export const LdapLoginForm: React.FC<Props> = ({ csrfToken, onSuccess }) => {
     };
 
     return (
-        <Box component="form" onSubmit={handleSubmit}>
+        <Box component='form' onSubmit={handleSubmit}>
             <Stack spacing={2}>
                 {error && <div style={{ color: 'red' }}>{error}</div>}
                 <TextField
                     fullWidth
-                    label="Username"
+                    label='Username'
                     value={username}
                     onChange={e => setUsername(e.target.value)}
                     required
                 />
                 <TextField
                     fullWidth
-                    label="Password"
-                    type="password"
+                    label='Password'
+                    type='password'
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     required
                 />
-                <Button type="submit" fullWidth variant="contained">
+                <Button type='submit' fullWidth variant='contained'>
                     Login with LDAP
                 </Button>
             </Stack>
