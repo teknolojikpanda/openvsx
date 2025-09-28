@@ -7,22 +7,55 @@ on:
 env:
   SERVER_TAG: ghcr.io/teknolojikpanda/openvsx-server
   WEBUI_TAG: ghcr.io/teknolojikpanda/openvsx-webui
+  REGISTRY: ghcr.io
 
 jobs:
   build:
     permissions:
-      contents: none
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+      
     runs-on: ubuntu-latest
+    
     steps:
-    - uses: actions/checkout@v2
-    - name: Set Image Version
-      run: echo "IMAGE_VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-    - name: Build Web UI Image
-      run: docker build -t $WEBUI_TAG:$IMAGE_VERSION webui
-    - name: Build Server Image
-      run: docker build -t $SERVER_TAG:$IMAGE_VERSION server
-    - name: Push Docker Images
-      run: |
-        echo ${{ secrets.BOT_ACCESS_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-        docker push $SERVER_TAG:$IMAGE_VERSION
-        docker push $WEBUI_TAG:$IMAGE_VERSION
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      
+    - name: Log in to the Container registry
+      uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.BOT_ACCESS_TOKEN }}
+        
+    - name: Build and push Docker image - WEBUI
+      id: webui-push
+      uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+      with:
+        context: webui
+        push: true
+        tags: ${{ env.WEBUI_TAG }}:${{ github.event.release.tag_name }}
+        
+    - name: Build and push Docker image - SERVER
+      id: server-push
+      uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+      with:
+        context: server
+        push: true
+        tags: ${{ env.SERVER_TAG }}:${{ github.event.release.tag_name }}
+        
+    - name: Server Generate artifact attestation
+      uses: actions/attest-build-provenance@v3
+      with:
+        subject-name: ${{ env.REGISTRY }}/${{ env.SERVER_TAG }}
+        subject-digest: ${{ steps.server-push.outputs.digest }}
+        push-to-registry: true
+        
+    - name: Web UI Generate artifact attestation
+      uses: actions/attest-build-provenance@v3
+      with:
+        subject-name: ${{ env.REGISTRY }}/${{ env.WEBUI_TAG }}
+        subject-digest: ${{ steps.webui-push.outputs.digest }}
+        push-to-registry: true
