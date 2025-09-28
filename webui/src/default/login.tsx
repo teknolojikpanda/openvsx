@@ -7,157 +7,56 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  * ****************************************************************************** */
-import React, { FunctionComponent, ReactNode, useState, useEffect } from 'react';
-import { Button, Dialog, DialogContent, DialogTitle, Stack, TextField, Box } from '@mui/material';
+import React, { FunctionComponent, ReactNode, useState } from 'react';
+import { Button, Dialog, DialogContent, DialogTitle, Stack } from '@mui/material';
+import { useCsrfToken } from '../hooks/useCsrfToken';
+import { LdapLoginForm } from '../components/LdapLoginForm';
 
-export const LoginComponent: FunctionComponent<LoginComponentProps> = (props) => {
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [csrfToken, setCsrfToken] = useState('');
-    const [error, setError] = useState('');
+export const LoginComponent: FunctionComponent<LoginComponentProps> = ({ loginProviders, renderButton }) => {
+    const [open, setOpen] = useState(false);
+    const { token: csrfToken, loading: csrfLoading, error: csrfError } = useCsrfToken();
 
-    const showLoginDialog = () => setDialogOpen(true);
-
-    useEffect(() => {
-        // Fetch CSRF token when component mounts
-        const serverUrl = process.env.REACT_APP_SERVER_URL || window.location.origin;
-        fetch(`${serverUrl}/user/csrf`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.token) {
-                    setCsrfToken(data.token);
-                }
-            })
-            .catch(error => {
-                console.warn('Failed to fetch CSRF token:', error);
-                // Try without credentials for cross-origin request
-                fetch(`${serverUrl}/user/csrf`, { credentials: 'include' })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.token) {
-                            setCsrfToken(data.token);
-                        }
-                    })
-                    .catch(err => console.warn('CSRF token fetch failed completely:', err));
-            });
-    }, []);
-
-    const handleLdapLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        
-        const formData = new FormData();
-        formData.append('username', username);
-        formData.append('password', password);
-        if (csrfToken) {
-            formData.append('_csrf', csrfToken);
-        }
-
-        try {
-            const serverUrl = process.env.REACT_APP_SERVER_URL || window.location.origin;
-            const response = await fetch(`${serverUrl}/login`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                let result;
-                try {
-                    result = await response.json();
-                } catch (jsonErr) {
-                    setError('Invalid server response');
-                    return;
-                }
-                if (result && typeof result.success !== 'undefined') {
-                    if (result.success) {
-                        setDialogOpen(false);
-                        window.location.reload();
-                    } else {
-                        setError(result.error || 'Login failed');
-                    }
-                } else {
-                    setError('Unexpected response format');
-                }
-            } else {
-                let errorData;
-                try {
-                    errorData = await response.json();
-                } catch (jsonErr) {
-                    setError('Invalid error response from server');
-                    return;
-                }
-                setError(errorData.error || 'Login failed');
-            }
-        } catch (err) {
-            console.error('Login error:', err);
-            setError('Network error occurred');
-        }
-    };
-
-    const providers = Object.keys(props.loginProviders);
-    const hasLdap = providers.indexOf('ldap') !== -1;
-    const oauthProviders = providers.filter(p => p !== 'ldap');
+    const providers = Object.keys(loginProviders);
+    const hasLdap = providers.includes('ldap');
+    const oauth = providers.filter(p => p !== 'ldap');
 
     if (providers.length === 1 && !hasLdap) {
-        return props.renderButton(props.loginProviders[providers[0]]);
-    } else {
-        return <>
-            {props.renderButton(undefined, showLoginDialog)}
-            <Dialog
-                fullWidth
-                open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-            >
+        return renderButton(loginProviders[providers[0]]);
+    }
+
+    const onSuccess = () => {
+        setOpen(false);
+        window.location.reload();
+    };
+
+    return (
+        <>
+            {renderButton(undefined, () => setOpen(true))}
+            <Dialog open={open} onClose={() => setOpen(false)} fullWidth>
                 <DialogTitle>Log In</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2}>
-                        {hasLdap && (
-                            <Box component='form' onSubmit={handleLdapLogin}>
-                                <Stack spacing={2}>
-                                    {error && (
-                                        <div style={{color: 'red', padding: '8px', backgroundColor: '#ffebee', borderRadius: '4px'}}>
-                                            {error}
-                                        </div>
-                                    )}
-                                    <TextField
-                                        fullWidth
-                                        label='Username'
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        required
-                                    />
-                                    <TextField
-                                        fullWidth
-                                        label='Password'
-                                        type='password'
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                    <Button type='submit' fullWidth variant='contained' color='primary'>
-                                        Login with LDAP
-                                    </Button>
-                                </Stack>
-                            </Box>
+                        {csrfError && (
+                            <div style={{ color: 'red', marginBottom: '1em' }}>
+                                {csrfError}
+                            </div>
                         )}
-                        {oauthProviders.map((provider) => (
-                            <Button
-                                key={provider}
-                                fullWidth
-                                variant='contained'
-                                color='secondary'
-                                href={props.loginProviders[provider]}
-                            >
-                                Login with {provider}
+                        {hasLdap && (
+                            <LdapLoginForm 
+                                csrfToken={csrfToken} 
+                                onSuccess={onSuccess}
+                            />
+                        )}
+                        {oauth.map(p => (
+                            <Button key={p} href={loginProviders[p]} fullWidth variant="contained">
+                                Login with {p}
                             </Button>
                         ))}
                     </Stack>
                 </DialogContent>
             </Dialog>
-        </>;
-    }
+        </>
+    );
 };
 
 export interface LoginComponentProps {

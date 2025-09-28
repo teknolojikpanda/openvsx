@@ -42,72 +42,44 @@ public class UserAttributesMapper {
         public String email() { return email; }
     }
 
+    private Optional<String> safeGet(Attributes attrs, String name) {
+        try {
+            var a = attrs.get(name);
+            return (a != null) ? Optional.ofNullable((String) a.get()) : Optional.empty();
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    private String extractFullName(Attributes attrs, String username) {
+        return safeGet(attrs, "displayName")
+            .filter(s -> !s.isBlank())
+            .or(() -> safeGet(attrs, "givenName")
+                .flatMap(given -> safeGet(attrs, "sn")
+                    .map(sn -> given + " " + sn)))
+            .or(() -> safeGet(attrs, "cn")
+                .filter(cn -> !cn.equals(username)))
+            .orElse(username);
+    }
+
     public UserAttributes map(String username) {
         try {
             var results = ldap.search(
                 base,
                 "(uid=" + username + ")",
                 searchControls(),
-                (AttributesMapper<String[]>) attrs -> {
-                    String displayName = null;
-                    try {
-                        var attr = attrs.get("displayName");
-                        if (attr != null) {
-                            displayName = (String) attr.get();
-                        }
-                    } catch (Exception e) {
-                        // Ignore attribute access errors
-                    }
-                    String fullNameResult = username;
-                    if (displayName != null && !displayName.trim().isEmpty()) {
-                        fullNameResult = displayName;
-                    } else {
-                        String givenName = null;
-                        String surname = null;
-                        try {
-                            var givenAttr = attrs.get("givenName");
-                            if (givenAttr != null) givenName = (String) givenAttr.get();
-                            var snAttr = attrs.get("sn");
-                            if (snAttr != null) surname = (String) snAttr.get();
-                        } catch (Exception e) {
-                            // Ignore attribute access errors
-                        }
-                        if (givenName != null && surname != null) {
-                            fullNameResult = givenName + " " + surname;
-                        } else {
-                            String cn = null;
-                            try {
-                                var cnAttr = attrs.get("cn");
-                                if (cnAttr != null) cn = (String) cnAttr.get();
-                            } catch (Exception e) {
-                                // Ignore attribute access errors
-                            }
-                            if (cn != null && !cn.equals(username)) {
-                                fullNameResult = cn;
-                            }
-                        }
-                    }
-                    
-                    String mail = username + "@company.com";
-                    try {
-                        var mailAttr = attrs.get("mail");
-                        if (mailAttr != null) {
-                            mail = (String) mailAttr.get();
-                        } else {
-                            var emailAttr = attrs.get("email");
-                            if (emailAttr != null) {
-                                mail = (String) emailAttr.get();
-                            }
-                        }
-                    } catch (Exception e) {
-                        // Use fallback email
-                    }
-                    return new String[]{fullNameResult, mail};
+                (AttributesMapper<UserAttributes>) attrs -> {
+                    String fullName = extractFullName(attrs, username);
+                    String email = java.util.stream.Stream.of("mail", "email")
+                        .map(attr -> safeGet(attrs, attr))
+                        .flatMap(Optional::stream)
+                        .findFirst()
+                        .orElse(username + "@company.com");
+                    return new UserAttributes(fullName, email);
                 }
             );
-            if (!results.isEmpty() && results.get(0) != null) {
-                var arr = results.get(0);
-                return new UserAttributes(arr[0], arr[1]);
+            if (!results.isEmpty()) {
+                return results.get(0);
             }
         } catch (Exception e) {
             logger.warn("LDAP attr lookup failed", e);

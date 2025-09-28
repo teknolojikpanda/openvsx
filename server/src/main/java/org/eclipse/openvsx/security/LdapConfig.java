@@ -37,6 +37,9 @@ public class LdapConfig {
     @Value("${ovsx.ldap.password:}")
     private String ldapPassword;
 
+    @Value("${ovsx.ldap.userSearchBase:ou=users}")
+    private String userSearchBase;
+
     @Bean
     @ConditionalOnProperty(name = "ovsx.ldap.url", matchIfMissing = false)
     public LdapContextSource contextSource() {
@@ -59,6 +62,12 @@ public class LdapConfig {
     @ConditionalOnProperty(name = "ovsx.ldap.url", matchIfMissing = false)
     public LdapTemplate ldapTemplate() {
         return new LdapTemplate(contextSource());
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "ovsx.ldap.url", matchIfMissing = false)
+    public UserAttributesMapper userAttributesMapper() {
+        return new UserAttributesMapper(ldapTemplate(), userSearchBase);
     }
 
     @PostConstruct

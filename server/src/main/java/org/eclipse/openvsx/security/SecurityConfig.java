@@ -92,7 +92,7 @@ public class SecurityConfig {
         var cors = new org.springframework.web.cors.CorsConfiguration();
         cors.setAllowedOrigins(java.util.List.of(corsAllowedOrigins.split(",")));
         cors.setAllowedMethods(java.util.List.of(corsAllowedMethods.split(",")));
-        cors.setAllowedHeaders(java.util.List.of("*"));
+        cors.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
         cors.setAllowCredentials(true);
         var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cors);
@@ -103,21 +103,21 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, OAuth2UserServices userServices) throws Exception {
         var filterChain = http.authorizeHttpRequests(
                 registry -> registry
-                        .requestMatchers(antMatchers("/*", "/login/**", "/oauth2/**", "/login-providers", "/user", "/user/auth-error", "/logout", "/ldap-test", "/actuator/health/**", "/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus", "/v3/api-docs/**", "/swagger-resources/**", "/swagger-ui/**", "/webjars/**"))
+                        .requestMatchers(toMatchers("/*", "/login/**", "/oauth2/**", "/login-providers", "/user", "/user/auth-error", "/logout", "/actuator/health/**", "/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus", "/v3/api-docs/**", "/swagger-resources/**", "/swagger-ui/**", "/webjars/**"))
                             .permitAll()
-                        .requestMatchers(pathMatchers("/api/*/*/review", "/api/*/*/review/delete", "/api/user/publish", "/api/user/namespace/create"))
+                        .requestMatchers(toMatchers("/api/*/*/review", "/api/*/*/review/delete", "/api/user/publish", "/api/user/namespace/create"))
                             .authenticated()
-                        .requestMatchers(pathMatchers("/api/**", "/vscode/**", "/documents/**", "/admin/api/**", "/admin/report"))
+                        .requestMatchers(toMatchers("/api/**", "/vscode/**", "/documents/**", "/admin/api/**", "/admin/report"))
                             .permitAll()
-                        .requestMatchers(pathMatchers("/admin/**"))
+                        .requestMatchers(toMatchers("/admin/**", "/ldap-test"))
                             .hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(pathMatchers(frontendRoutes))
+                        .requestMatchers(toMatchers(frontendRoutes))
                             .permitAll()
                         .anyRequest()
                             .authenticated()
                 )
                 .cors(org.springframework.security.config.Customizer.withDefaults())
-                .csrf(configurer -> configurer.ignoringRequestMatchers(antMatchers("/api/-/publish", "/api/-/namespace/create", "/api/-/query", "/vscode/**", "/admin/api/**", "/login")))
+                .csrf(configurer -> configurer.ignoringRequestMatchers(toMatchers("/api/-/publish", "/api/-/namespace/create", "/api/-/query", "/vscode/**", "/admin/api/**", "/login")))
                 .exceptionHandling(configurer -> configurer.authenticationEntryPoint(new Http403ForbiddenEntryPoint()));
 
         if (ldapConfig.isLdapEnabled()) {
@@ -131,7 +131,7 @@ public class SecurityConfig {
     }
 
     private void configureLdapAuth(HttpSecurity http) throws Exception {
-        String redirectUrl = StringUtils.isEmpty(webuiUrl) ? "http://localhost:3000/" : webuiUrl;
+        String redirectUrl = getRedirectUrl();
         http.formLogin(configurer -> {
             configurer.loginPage("/login")
                     .loginProcessingUrl("/login")
@@ -154,7 +154,7 @@ public class SecurityConfig {
     }
 
     private void configureOAuth2(HttpSecurity http, OAuth2UserServices userServices) throws Exception {
-        String redirectUrl = StringUtils.isEmpty(webuiUrl) ? "http://localhost:3000/" : webuiUrl;
+        String redirectUrl = getRedirectUrl();
         http.oauth2Login(configurer -> {
             configurer.defaultSuccessUrl(redirectUrl);
             configurer.successHandler(new CustomAuthenticationSuccessHandler(redirectUrl));
@@ -209,18 +209,13 @@ public class SecurityConfig {
         }
     }
 
-    private RequestMatcher[] antMatchers(String... patterns)
-    {
-        var pathMatchers = new RequestMatcher[patterns.length];
-        for(var i = 0; i < patterns.length; i++) {
-            pathMatchers[i] = PathPatternRequestMatcher.withDefaults().matcher(patterns[i]);
-        }
-
-        return pathMatchers;
+    private RequestMatcher[] toMatchers(String... patterns) {
+        return java.util.Arrays.stream(patterns)
+            .map(PathPatternRequestMatcher.withDefaults()::matcher)
+            .toArray(RequestMatcher[]::new);
     }
 
-    private RequestMatcher[] pathMatchers(String... patterns)
-    {
-        return antMatchers(patterns);
+    private String getRedirectUrl() {
+        return org.apache.commons.lang3.StringUtils.defaultIfEmpty(webuiUrl, "http://localhost:3000/");
     }
 }
