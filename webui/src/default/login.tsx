@@ -21,7 +21,8 @@ export const LoginComponent: FunctionComponent<LoginComponentProps> = (props) =>
 
     useEffect(() => {
         // Fetch CSRF token when component mounts
-        fetch('http://localhost:8080/user/csrf')
+        const serverUrl = process.env.REACT_APP_SERVER_URL || window.location.origin;
+        fetch(`${serverUrl}/user/csrf`)
             .then(response => response.json())
             .then(data => {
                 if (data.token) {
@@ -31,7 +32,7 @@ export const LoginComponent: FunctionComponent<LoginComponentProps> = (props) =>
             .catch(error => {
                 console.warn('Failed to fetch CSRF token:', error);
                 // Try without credentials for cross-origin request
-                fetch('http://localhost:8080/user/csrf', { credentials: 'include' })
+                fetch(`${serverUrl}/user/csrf`, { credentials: 'include' })
                     .then(response => response.json())
                     .then(data => {
                         if (data.token) {
@@ -54,20 +55,39 @@ export const LoginComponent: FunctionComponent<LoginComponentProps> = (props) =>
         }
 
         try {
-            const response = await fetch('http://localhost:8080/login', {
+            const serverUrl = process.env.REACT_APP_SERVER_URL || window.location.origin;
+            const response = await fetch(`${serverUrl}/login`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include'
             });
 
             if (response.ok) {
-                const result = await response.json();
-                if (result.success) {
-                    setDialogOpen(false);
-                    window.location.reload();
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonErr) {
+                    setError('Invalid server response');
+                    return;
+                }
+                if (result && typeof result.success !== 'undefined') {
+                    if (result.success) {
+                        setDialogOpen(false);
+                        window.location.reload();
+                    } else {
+                        setError(result.error || 'Login failed');
+                    }
+                } else {
+                    setError('Unexpected response format');
                 }
             } else {
-                const errorData = await response.json();
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (jsonErr) {
+                    setError('Invalid error response from server');
+                    return;
+                }
                 setError(errorData.error || 'Login failed');
             }
         } catch (err) {

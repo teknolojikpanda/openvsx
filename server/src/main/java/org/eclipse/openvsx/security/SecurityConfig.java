@@ -64,6 +64,12 @@ public class SecurityConfig {
     @Value("${ovsx.ldap.base:}")
     String ldapBase;
 
+    @Value("${ovsx.cors.allowedOrigins:http://localhost:3000}")
+    String corsAllowedOrigins;
+
+    @Value("${ovsx.cors.allowedMethods:GET,POST,PUT,DELETE,OPTIONS}")
+    String corsAllowedMethods;
+
     private final LdapConfig ldapConfig;
     private final LdapUserService ldapUserService;
     private final org.eclipse.openvsx.UserService userService;
@@ -79,6 +85,18 @@ public class SecurityConfig {
     @PostConstruct
     public void logSecurityConfig() {
         logger.info("SecurityConfig - UserSearchBase: '{}', UserSearchFilter: '{}'", ldapUserSearchBase, ldapUserSearchFilter);
+    }
+
+    @Bean
+    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+        var cors = new org.springframework.web.cors.CorsConfiguration();
+        cors.setAllowedOrigins(java.util.List.of(corsAllowedOrigins.split(",")));
+        cors.setAllowedMethods(java.util.List.of(corsAllowedMethods.split(",")));
+        cors.setAllowedHeaders(java.util.List.of("*"));
+        cors.setAllowCredentials(true);
+        var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cors);
+        return source;
     }
 
     @Bean
@@ -98,54 +116,52 @@ public class SecurityConfig {
                         .anyRequest()
                             .authenticated()
                 )
-                .cors(configurer -> configurer.configurationSource(request -> {
-                    var cors = new org.springframework.web.cors.CorsConfiguration();
-                    cors.setAllowedOrigins(java.util.List.of("http://localhost:3000"));
-                    cors.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                    cors.setAllowedHeaders(java.util.List.of("*"));
-                    cors.setAllowCredentials(true);
-                    return cors;
-                }))
+                .cors(org.springframework.security.config.Customizer.withDefaults())
                 .csrf(configurer -> configurer.ignoringRequestMatchers(antMatchers("/api/-/publish", "/api/-/namespace/create", "/api/-/query", "/vscode/**", "/admin/api/**", "/login")))
                 .exceptionHandling(configurer -> configurer.authenticationEntryPoint(new Http403ForbiddenEntryPoint()));
 
-        // Configure LDAP authentication if enabled
         if (ldapConfig.isLdapEnabled()) {
-            var redirectUrl = StringUtils.isEmpty(webuiUrl) ? "http://localhost:8080/" : webuiUrl;
-            filterChain.formLogin(configurer -> {
-                configurer.loginPage("/login")
-                        .loginProcessingUrl("/login")
-                        .usernameParameter("username")
-                        .passwordParameter("password")
-                        .successHandler(new LdapAuthenticationSuccessHandler(redirectUrl, userService, ldapTemplate, ldapUserSearchBase, ldapGroupSearchBase, ldapGroupSearchFilter, ldapAdminGroups, ldapBase))
-                        .failureHandler((request, response, exception) -> {
-                            logger.error("LDAP Authentication Failed: " + exception.getMessage());
-                            response.setContentType("application/json");
-                            response.setStatus(401);
-                            response.getWriter().write("{\"error\":\"Invalid username or password\"}");
-                        })
-                        .permitAll();
-            });
-            try {
-                filterChain.authenticationProvider(ldapAuthenticationProvider());
-            } catch (Exception e) {
-                logger.error("LDAP provider not available, skipping LDAP configuration: {}", e.getMessage());
-            }
+            configureLdapAuth(filterChain);
         }
-
-        // Configure OAuth2 authentication if enabled
-        if(userServices.canLogin()) {
-            var redirectUrl = StringUtils.isEmpty(webuiUrl) ? "http://localhost:3000/" : webuiUrl;
-            filterChain.oauth2Login(configurer -> {
-                configurer.defaultSuccessUrl(redirectUrl);
-                configurer.successHandler(new CustomAuthenticationSuccessHandler(redirectUrl));
-                configurer.failureUrl(redirectUrl + "?auth-error");
-                configurer.userInfoEndpoint(customizer -> customizer.oidcUserService(userServices.getOidc()).userService(userServices.getOauth2()));
-            })
-            .logout(configurer -> configurer.logoutSuccessUrl(redirectUrl));
+        if (userServices.canLogin()) {
+            configureOAuth2(filterChain, userServices);
         }
 
         return filterChain.build();
+    }
+
+    private void configureLdapAuth(HttpSecurity http) throws Exception {
+        String redirectUrl = StringUtils.isEmpty(webuiUrl) ? "http://localhost:3000/" : webuiUrl;
+        http.formLogin(configurer -> {
+            configurer.loginPage("/login")
+                    .loginProcessingUrl("/login")
+                    .usernameParameter("username")
+                    .passwordParameter("password")
+                    .successHandler(new LdapAuthenticationSuccessHandler(redirectUrl, userService, ldapTemplate, ldapUserSearchBase, ldapGroupSearchBase, ldapGroupSearchFilter, ldapAdminGroups, ldapBase))
+                    .failureHandler((request, response, exception) -> {
+                        logger.error("LDAP Authentication Failed: " + exception.getMessage());
+                        response.setContentType("application/json");
+                        response.setStatus(401);
+                        response.getWriter().write("{\"error\":\"Invalid username or password\"}");
+                    })
+                    .permitAll();
+        });
+        try {
+            http.authenticationProvider(ldapAuthenticationProvider());
+        } catch (Exception e) {
+            logger.error("LDAP provider not available, skipping LDAP configuration: {}", e.getMessage());
+        }
+    }
+
+    private void configureOAuth2(HttpSecurity http, OAuth2UserServices userServices) throws Exception {
+        String redirectUrl = StringUtils.isEmpty(webuiUrl) ? "http://localhost:3000/" : webuiUrl;
+        http.oauth2Login(configurer -> {
+            configurer.defaultSuccessUrl(redirectUrl);
+            configurer.successHandler(new CustomAuthenticationSuccessHandler(redirectUrl));
+            configurer.failureUrl(redirectUrl + "?auth-error");
+            configurer.userInfoEndpoint(customizer -> customizer.oidcUserService(userServices.getOidc()).userService(userServices.getOauth2()));
+        })
+        .logout(configurer -> configurer.logoutSuccessUrl(redirectUrl));
     }
 
     @Bean
@@ -201,5 +217,10 @@ public class SecurityConfig {
         }
 
         return pathMatchers;
+    }
+
+    private RequestMatcher[] pathMatchers(String... patterns)
+    {
+        return antMatchers(patterns);
     }
 }

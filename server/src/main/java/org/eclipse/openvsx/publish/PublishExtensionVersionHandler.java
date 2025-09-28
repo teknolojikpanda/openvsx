@@ -19,6 +19,7 @@ import org.eclipse.openvsx.ExtensionValidator;
 import org.eclipse.openvsx.UserService;
 import org.eclipse.openvsx.adapter.VSCodeIdNewExtensionJobRequest;
 import org.eclipse.openvsx.entities.*;
+import org.eclipse.openvsx.entities.UserData;
 import org.eclipse.openvsx.extension_control.ExtensionControlService;
 import org.eclipse.openvsx.repositories.RepositoryService;
 import org.eclipse.openvsx.util.ErrorResultException;
@@ -50,6 +51,7 @@ public class PublishExtensionVersionHandler {
     private final UserService users;
     private final ExtensionValidator validator;
     private final ExtensionControlService extensionControl;
+    private final PublishConfig config;
 
     public PublishExtensionVersionHandler(
             PublishExtensionVersionService service,
@@ -59,7 +61,8 @@ public class PublishExtensionVersionHandler {
             JobRequestScheduler scheduler,
             UserService users,
             ExtensionValidator validator,
-            ExtensionControlService extensionControl
+            ExtensionControlService extensionControl,
+            PublishConfig config
     ) {
         this.service = service;
         this.integrityService = integrityService;
@@ -69,6 +72,7 @@ public class PublishExtensionVersionHandler {
         this.users = users;
         this.validator = validator;
         this.extensionControl = extensionControl;
+        this.config = config;
     }
 
     @Transactional(rollbackOn = ErrorResultException.class)
@@ -100,18 +104,25 @@ public class PublishExtensionVersionHandler {
     private ExtensionVersion createExtensionVersion(ExtensionProcessor processor, UserData user, PersonalAccessToken token, LocalDateTime timestamp) {
         var namespaceName = processor.getNamespace();
         var namespace = repositories.findNamespace(namespaceName);
+        
         if (namespace == null) {
-            // Auto-create namespace
-            namespace = new Namespace();
-            namespace.setName(namespaceName);
-            entityManager.persist(namespace);
+            boolean userCanCreateNamespace = users.isAdmin(user) || UserData.ROLE_PRIVILEGED.equals(user.getRole());
             
-            // Add user as owner of the new namespace
-            var membership = new NamespaceMembership();
-            membership.setNamespace(namespace);
-            membership.setUser(user);
-            membership.setRole(NamespaceMembership.ROLE_OWNER);
-            entityManager.persist(membership);
+            if (config.isAllowNamespaceAutoCreation() && userCanCreateNamespace) {
+                // Auto-create namespace
+                namespace = new Namespace();
+                namespace.setName(namespaceName);
+                entityManager.persist(namespace);
+                
+                // Add user as owner of the new namespace
+                var membership = new NamespaceMembership();
+                membership.setNamespace(namespace);
+                membership.setUser(user);
+                membership.setRole(NamespaceMembership.ROLE_OWNER);
+                entityManager.persist(membership);
+            } else {
+                throw new ErrorResultException("Namespace does not exist and auto-creation is not permitted or user lacks permission: " + namespaceName);
+            }
         } else {
             // Check permissions only for existing namespaces
             if (!users.hasPublishPermission(user, namespace)) {

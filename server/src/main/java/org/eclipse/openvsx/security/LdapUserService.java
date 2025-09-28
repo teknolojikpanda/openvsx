@@ -29,13 +29,17 @@ import static org.springframework.security.core.authority.AuthorityUtils.createA
 @Service
 public class LdapUserService implements UserDetailsService {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LdapUserService.class);
+    
     private final UserService userService;
+    private final String fallbackEmailDomain;
 
     @Value("${ovsx.ldap.userSearchFilter:(uid={0})}")
     private String userSearchFilter;
 
-    public LdapUserService(UserService userService) {
+    public LdapUserService(UserService userService, @Value("${ovsx.ldap.fallbackEmailDomain:company.com}") String fallbackEmailDomain) {
         this.userService = userService;
+        this.fallbackEmailDomain = fallbackEmailDomain;
     }
 
     @Override
@@ -45,8 +49,23 @@ public class LdapUserService implements UserDetailsService {
         userData.setLoginName(username);
         userData.setProvider("ldap");
         userData.setAuthId("ldap:" + username);
-        userData.setFullName(username); // Can be enhanced to get from LDAP attributes
-        userData.setEmail(username + "@company.com"); // Can be enhanced to get from LDAP attributes
+        // Simulate fetching LDAP attributes (replace with actual LDAP lookup if available)
+        String ldapFullName = null; // TODO: fetch from LDAP
+        String ldapEmail = null;    // TODO: fetch from LDAP
+
+        if (ldapFullName == null || ldapFullName.isBlank()) {
+            logger.warn("LDAP full name missing for user '{}', falling back to username.", username);
+            userData.setFullName(username);
+        } else {
+            userData.setFullName(ldapFullName);
+        }
+
+        if (ldapEmail == null || ldapEmail.isBlank()) {
+            logger.warn("LDAP email missing for user '{}', falling back to '{}@{}'.", username, username, fallbackEmailDomain);
+            userData.setEmail(username + "@" + fallbackEmailDomain);
+        } else {
+            userData.setEmail(ldapEmail);
+        }
 
         userData = userService.upsertUser(userData);
         

@@ -318,8 +318,11 @@ public class UserService {
                 updated = true;
             }
             if (!StringUtils.equals(userData.getRole(), newUser.getRole())) {
-                userData.setRole(newUser.getRole());
-                updated = true;
+                // Only allow role updates from trusted sources (LDAP provider)
+                if ("ldap".equals(newUser.getProvider())) {
+                    userData.setRole(newUser.getRole());
+                    updated = true;
+                }
             }
             if (updated) {
                 cache.evictExtensionJsons(userData);
@@ -327,6 +330,10 @@ public class UserService {
         }
 
         return userData;
+    }
+
+    public boolean isAdmin(UserData user) {
+        return UserData.ROLE_ADMIN.equals(user.getRole());
     }
 
     public Map<String, String> getLoginProviders() {
