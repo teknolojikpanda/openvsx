@@ -29,7 +29,7 @@ export const LdapLoginForm: React.FC<Props> = ({ csrfToken, onSuccess }) => {
         if (csrfToken) formData.append('_csrf', csrfToken);
 
         try {
-            const url = process.env.REACT_APP_SERVER_URL || window.location.origin;
+            const url = (process as any).env.REACT_APP_SERVER_URL || window.location.origin;
             const res = await fetch(`${url}/login`, {
                 method: 'POST',
                 credentials: 'include',

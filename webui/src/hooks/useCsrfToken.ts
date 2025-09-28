@@ -15,7 +15,7 @@ export function useCsrfToken() {
     const [error, setError] = useState<string>('');
 
     useEffect(() => {
-        const url = process.env.REACT_APP_SERVER_URL || window.location.origin;
+        const url = (process as any).env.REACT_APP_SERVER_URL || window.location.origin;
         
         async function fetchToken(opts?: RequestInit) {
             try {

@@ -14,10 +14,10 @@ import { LdapLoginForm } from '../components/LdapLoginForm';
 
 export const LoginComponent: FunctionComponent<LoginComponentProps> = ({ loginProviders, renderButton }) => {
     const [open, setOpen] = useState(false);
-    const { token: csrfToken, loading: csrfLoading, error: csrfError } = useCsrfToken();
+    const { token: csrfToken, error: csrfError } = useCsrfToken();
 
     const providers = Object.keys(loginProviders);
-    const hasLdap = providers.includes('ldap');
+    const hasLdap = providers.indexOf('ldap') !== -1;
     const oauth = providers.filter(p => p !== 'ldap');
 
     if (providers.length === 1 && !hasLdap) {
