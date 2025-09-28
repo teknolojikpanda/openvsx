@@ -7,34 +7,56 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  * ****************************************************************************** */
-import React, { FunctionComponent, ReactNode, useState } from "react";
-import { Button, Dialog, DialogContent, DialogTitle, Stack } from "@mui/material";
+import React, { FunctionComponent, ReactNode, useState } from 'react';
+import { Button, Dialog, DialogContent, DialogTitle, Stack } from '@mui/material';
+import { useCsrfToken } from '../hooks/useCsrfToken';
+import { LdapLoginForm } from '../components/LdapLoginForm';
 
-export const LoginComponent: FunctionComponent<LoginComponentProps> = (props) => {
-    const [dialogOpen, setDialogOpen] = useState(false);
+export const LoginComponent: FunctionComponent<LoginComponentProps> = ({ loginProviders, renderButton }) => {
+    const [open, setOpen] = useState(false);
+    const { token: csrfToken, error: csrfError } = useCsrfToken();
 
-    const showLoginDialog = () => setDialogOpen(true);
+    const providers = Object.keys(loginProviders);
+    const hasLdap = providers.indexOf('ldap') !== -1;
+    const oauth = providers.filter(p => p !== 'ldap');
 
-    const providers = Object.keys(props.loginProviders);
-    if (providers.length === 1) {
-        return props.renderButton(props.loginProviders[providers[0]]);
-    } else {
-        return <>
-            {props.renderButton(undefined, showLoginDialog)}
-            <Dialog
-                fullWidth
-                open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-            >
+    if (providers.length === 1 && !hasLdap) {
+        return renderButton(loginProviders[providers[0]]);
+    }
+
+    const onSuccess = () => {
+        setOpen(false);
+        window.location.reload();
+    };
+
+    return (
+        <>
+            {renderButton(undefined, () => setOpen(true))}
+            <Dialog open={open} onClose={() => setOpen(false)} fullWidth>
                 <DialogTitle>Log In</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2}>
-                        {providers.map((provider) => (<Button key={provider} fullWidth variant='contained' color='secondary' href={props.loginProviders[provider]}>{provider}</Button>))}
+                        {csrfError && (
+                            <div style={{ color: 'red', marginBottom: '1em' }}>
+                                {csrfError}
+                            </div>
+                        )}
+                        {hasLdap && (
+                            <LdapLoginForm
+                                csrfToken={csrfToken}
+                                onSuccess={onSuccess}
+                            />
+                        )}
+                        {oauth.map(p => (
+                            <Button key={p} href={loginProviders[p]} fullWidth variant='contained'>
+                                Login with {p}
+                            </Button>
+                        ))}
                     </Stack>
                 </DialogContent>
             </Dialog>
-        </>;
-    }
+        </>
+    );
 };
 
 export interface LoginComponentProps {

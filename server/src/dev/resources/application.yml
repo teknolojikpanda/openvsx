@@ -165,3 +165,13 @@ ovsx:
   storage:
     local:
       directory: /tmp
+  ldap:
+    url: ${LDAP_URL:}
+    base: ${LDAP_BASE:}
+    userDn: ${LDAP_USER_DN:}
+    password: ${LDAP_PASSWORD:}
+    userSearchBase: ${LDAP_USER_SEARCH_BASE:ou=users}
+    userSearchFilter: ${LDAP_USER_SEARCH_FILTER:(uid={0})}
+    groupSearchBase: ${LDAP_GROUP_SEARCH_BASE:ou=groups}
+    groupSearchFilter: ${LDAP_GROUP_SEARCH_FILTER:(member=uid={0},{1},{2})}
+    adminGroups: ${LDAP_ADMIN_GROUPS:admins,openvsx-admins}

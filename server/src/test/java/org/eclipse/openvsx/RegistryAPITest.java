@@ -24,6 +24,7 @@ import org.eclipse.openvsx.entities.*;
 import org.eclipse.openvsx.extension_control.ExtensionControlService;
 import org.eclipse.openvsx.json.*;
 import org.eclipse.openvsx.publish.ExtensionVersionIntegrityService;
+import org.eclipse.openvsx.publish.PublishConfig;
 import org.eclipse.openvsx.publish.PublishExtensionVersionHandler;
 import org.eclipse.openvsx.publish.PublishExtensionVersionService;
 import org.eclipse.openvsx.repositories.RepositoryService;
@@ -1468,8 +1469,7 @@ class RegistryAPITest {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .content(bytes))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().json(errorJson("Unknown publisher: foo"
-                        + "\nUse the 'create-namespace' command to create a namespace corresponding to your publisher name.")));
+                .andExpect(content().json(errorJson("Namespace does not exist and auto-creation is not permitted or user lacks permission: foo")));
     }
 
     @Test
@@ -2516,7 +2516,8 @@ class RegistryAPITest {
                 JobRequestScheduler scheduler,
                 UserService users,
                 ExtensionValidator validator,
-                ExtensionControlService extensionControl
+                ExtensionControlService extensionControl,
+                PublishConfig config
         ) {
             return new PublishExtensionVersionHandler(
                     service,
@@ -2526,8 +2527,14 @@ class RegistryAPITest {
                     scheduler,
                     users,
                     validator,
-                    extensionControl
+                    extensionControl,
+                    config
             );
+        }
+
+        @Bean
+        PublishConfig publishConfig() {
+            return new PublishConfig();
         }
     }
 }

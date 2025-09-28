@@ -20,9 +20,9 @@ spring:
     jcache:
       config: classpath:ehcache.xml
   datasource:
-    url: jdbc:postgresql://localhost:5432/openvsx
-    username: openvsx
-    password: openvsx
+    url: ${DATASOURCE_URL:jdbc:postgresql://postgres:5432/openvsx}
+    username: ${DATASOURCE_USER:openvsx}
+    password: ${DATASOURCE_PASSWORD:openvsx}
   flyway:
     baseline-on-migrate: true
     baseline-version: 0.1.0
@@ -128,11 +128,16 @@ bucket4j:
               unit: seconds
 
 ovsx:
+  cors:
+    allowedOrigins: ${OVSX_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    allowedMethods: ${OVSX_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+  publish:
+    allowNamespaceAutoCreation: ${OVSX_ALLOW_NAMESPACE_AUTO_CREATION:true}
   databasesearch:
     enabled: false
   elasticsearch:
     clear-on-start: true
-    host: 'localhost:9200'
+    host: ${ELASTICSEARCH_HOST:elasticsearch:9200}
   extension-control:
     update-on-start: true
   integrity:
@@ -142,3 +147,14 @@ ovsx:
   storage:
     local:
       directory: /tmp
+  ldap:
+    url: ${LDAP_URL:}
+    base: ${LDAP_BASE:}
+    userDn: ${LDAP_USER_DN:}
+    password: ${LDAP_PASSWORD:}
+    userSearchBase: ${LDAP_USER_SEARCH_BASE:ou=users}
+    userSearchFilter: ${LDAP_USER_SEARCH_FILTER:(uid={0})}
+    groupSearchBase: ${LDAP_GROUP_SEARCH_BASE:ou=groups}
+    groupSearchFilter: ${LDAP_GROUP_SEARCH_FILTER:(member=uid={0},{1},{2})}
+    adminGroups: ${LDAP_ADMIN_GROUPS:admins,openvsx-admins}
+    fallbackEmailDomain: ${LDAP_FALLBACK_EMAIL_DOMAIN:company.com}

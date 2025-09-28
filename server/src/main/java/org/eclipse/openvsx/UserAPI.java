@@ -16,6 +16,7 @@ import org.eclipse.openvsx.entities.UserData;
 import org.eclipse.openvsx.json.*;
 import org.eclipse.openvsx.repositories.RepositoryService;
 import org.eclipse.openvsx.security.CodedAuthException;
+import org.eclipse.openvsx.security.LdapConfig;
 import org.eclipse.openvsx.storage.StorageUtilService;
 import org.eclipse.openvsx.util.ErrorResultException;
 import org.eclipse.openvsx.util.NotFoundException;
@@ -51,17 +52,20 @@ public class UserAPI {
     private final UserService users;
     private final EclipseService eclipse;
     private final StorageUtilService storageUtil;
+    private final LdapConfig ldapConfig;
 
     public UserAPI(
             RepositoryService repositories,
             UserService users,
             EclipseService eclipse,
-            StorageUtilService storageUtil
+            StorageUtilService storageUtil,
+            LdapConfig ldapConfig
     ) {
         this.repositories = repositories;
         this.users = users;
         this.eclipse = eclipse;
         this.storageUtil = storageUtil;
+        this.ldapConfig = ldapConfig;
     }
 
     @GetMapping(
@@ -70,6 +74,12 @@ public class UserAPI {
     public ResponseEntity<LoginProvidersJson> login() {
         var json = new LoginProvidersJson();
         var providers = users.getLoginProviders();
+        
+        // Add LDAP provider if enabled
+        if (ldapConfig.isLdapEnabled()) {
+            providers.put("ldap", "LDAP");
+        }
+        
         if(!providers.isEmpty()) {
             json.setLoginProviders(providers);
         } else {
@@ -114,7 +124,11 @@ public class UserAPI {
         json.setRole(user.getRole());
         json.setTokensUrl(createApiUrl(serverUrl, "user", "tokens"));
         json.setCreateTokenUrl(createApiUrl(serverUrl, "user", "token", "create"));
-        eclipse.enrichUserJson(json, user);
+        
+        // Only enrich with Eclipse data for OAuth users
+        if (!"ldap".equals(user.getProvider())) {
+            eclipse.enrichUserJson(json, user);
+        }
         return json;
     }
 
@@ -352,7 +366,11 @@ public class UserAPI {
             json.setRole(user.getRole());
             json.setTokensUrl(createApiUrl(serverUrl, "user", "tokens"));
             json.setCreateTokenUrl(createApiUrl(serverUrl, "user", "token", "create"));
-            eclipse.enrichUserJson(json, user, agreement);
+            
+            // Only enrich with Eclipse data for OAuth users
+            if (!"ldap".equals(user.getProvider())) {
+                eclipse.enrichUserJson(json, user, agreement);
+            }
 
             return ResponseEntity.ok(json);
         } catch (ErrorResultException exc) {

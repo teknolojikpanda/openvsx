@@ -14,6 +14,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.tika.Tika;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.mime.MimeTypeException;
@@ -43,6 +45,7 @@ import org.springframework.web.server.ServerErrorException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.eclipse.openvsx.cache.CacheService.CACHE_NAMESPACE_DETAILS_JSON;
@@ -50,6 +53,8 @@ import static org.eclipse.openvsx.util.UrlUtil.createApiUrl;
 
 @Component
 public class UserService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     private final EntityManager entityManager;
     private final RepositoryService repositories;
@@ -317,12 +322,34 @@ public class UserService {
                 userData.setAvatarUrl(newUser.getAvatarUrl());
                 updated = true;
             }
+            if (!StringUtils.equals(userData.getRole(), newUser.getRole())) {
+                // Only allow role updates from trusted sources (LDAP provider)
+                if ("ldap".equals(newUser.getProvider())) {
+                    // Validate new role against allowed roles
+                    Set<String> allowedRoles = Set.of("user", "admin", "privileged");
+                    String requestedRole = newUser.getRole();
+                    if (allowedRoles.contains(requestedRole)) {
+                        // Log the role change for audit purposes
+                        logger.info("Role change for user '{}': '{}' -> '{}' by provider '{}'",
+                            userData.getLoginName(), userData.getRole(), requestedRole, newUser.getProvider());
+                        userData.setRole(requestedRole);
+                        updated = true;
+                    } else {
+                        logger.warn("Unauthorized role change attempt for user '{}': '{}' -> '{}' by provider '{}'",
+                            userData.getLoginName(), userData.getRole(), requestedRole, newUser.getProvider());
+                    }
+                }
+            }
             if (updated) {
                 cache.evictExtensionJsons(userData);
             }
         }
 
         return userData;
+    }
+
+    public boolean isAdmin(UserData user) {
+        return UserData.ROLE_ADMIN.equals(user.getRole());
     }
 
     public Map<String, String> getLoginProviders() {
