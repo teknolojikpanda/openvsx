@@ -9,8 +9,8 @@ on:
       - master
 
 env:
-  SERVER_TAG: ghcr.io/eclipse/openvsx-server
-  WEBUI_TAG: ghcr.io/eclipse/openvsx-webui
+  SERVER_TAG: ghcr.io/teknolojikpanda/openvsx-server
+  WEBUI_TAG: ghcr.io/teknolojikpanda/openvsx-webui
 
 jobs:
   build:
@@ -46,18 +46,14 @@ jobs:
     - name: Run Server Tests
       if: steps.changed_server_files.outputs.any_changed == 'true'
       run: server/gradlew --no-daemon -p server check
-      env:
-        DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_API_TOKEN }}
     - name: Build Server Image
-      run: docker build -t $SERVER_TAG:$IMAGE_VERSION server --secret id=dv-key,env=DEVELOCITY_ACCESS_KEY
-      env:
-        DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_API_TOKEN }}
+      run: docker build -t $SERVER_TAG:$IMAGE_VERSION server
     - name: Push Docker Images
       run: |
         echo ${{ secrets.BOT_ACCESS_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
         docker push $SERVER_TAG:$IMAGE_VERSION
         docker push $WEBUI_TAG:$IMAGE_VERSION
-      if: github.repository == 'eclipse/openvsx' && github.ref == 'refs/heads/master'
+      if: github.repository == 'teknolojikpanda/openvsx' && github.ref == 'refs/heads/master'
     - name: Save PR number to file
       if: github.event_name == 'pull_request'
       run: echo ${{ github.event.number }} > PR_NUMBER.txt
