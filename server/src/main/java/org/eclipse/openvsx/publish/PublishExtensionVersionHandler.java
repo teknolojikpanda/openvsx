@@ -101,11 +101,22 @@ public class PublishExtensionVersionHandler {
         var namespaceName = processor.getNamespace();
         var namespace = repositories.findNamespace(namespaceName);
         if (namespace == null) {
-            throw new ErrorResultException("Unknown publisher: " + namespaceName
-                    + "\nUse the 'create-namespace' command to create a namespace corresponding to your publisher name.");
-        }
-        if (!users.hasPublishPermission(user, namespace)) {
-            throw new ErrorResultException("Insufficient access rights for publisher: " + namespace.getName());
+            // Auto-create namespace
+            namespace = new Namespace();
+            namespace.setName(namespaceName);
+            entityManager.persist(namespace);
+            
+            // Add user as owner of the new namespace
+            var membership = new NamespaceMembership();
+            membership.setNamespace(namespace);
+            membership.setUser(user);
+            membership.setRole(NamespaceMembership.ROLE_OWNER);
+            entityManager.persist(membership);
+        } else {
+            // Check permissions only for existing namespaces
+            if (!users.hasPublishPermission(user, namespace)) {
+                throw new ErrorResultException("Insufficient access rights for publisher: " + namespace.getName());
+            }
         }
 
         var extensionName = processor.getExtensionName();

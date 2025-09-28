@@ -52,6 +52,18 @@ public class SecurityConfig {
     @Value("${ovsx.ldap.userSearchFilter:(uid={0})}")
     String ldapUserSearchFilter;
 
+    @Value("${ovsx.ldap.groupSearchBase:}")
+    String ldapGroupSearchBase;
+
+    @Value("${ovsx.ldap.groupSearchFilter:(member=uid={0},{1},{2})}")
+    String ldapGroupSearchFilter;
+
+    @Value("${ovsx.ldap.adminGroups:admins,openvsx-admins}")
+    String ldapAdminGroups;
+
+    @Value("${ovsx.ldap.base:}")
+    String ldapBase;
+
     private final LdapConfig ldapConfig;
     private final LdapUserService ldapUserService;
     private final org.eclipse.openvsx.UserService userService;
@@ -105,7 +117,7 @@ public class SecurityConfig {
                         .loginProcessingUrl("/login")
                         .usernameParameter("username")
                         .passwordParameter("password")
-                        .successHandler(new LdapAuthenticationSuccessHandler(redirectUrl, userService, ldapTemplate))
+                        .successHandler(new LdapAuthenticationSuccessHandler(redirectUrl, userService, ldapTemplate, ldapUserSearchBase, ldapGroupSearchBase, ldapGroupSearchFilter, ldapAdminGroups, ldapBase))
                         .failureHandler((request, response, exception) -> {
                             logger.error("LDAP Authentication Failed: " + exception.getMessage());
                             response.setContentType("application/json");
@@ -169,7 +181,11 @@ public class SecurityConfig {
             };
             
             var provider = new LdapAuthenticationProvider(authenticator, authoritiesPopulator);
-            logger.info("LDAP authentication provider created successfully");
+            
+            // Enable strict password comparison to prevent partial password acceptance
+            provider.setUseAuthenticationRequestCredentials(true);
+            
+            logger.info("LDAP authentication provider created successfully with strict password validation");
             return provider;
         } catch (Exception e) {
             logger.error("Failed to create LDAP authentication provider: {}", e.getMessage(), e);

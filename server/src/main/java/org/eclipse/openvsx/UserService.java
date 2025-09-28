@@ -313,6 +313,10 @@ public class UserService {
                 userData.setAvatarUrl(newUser.getAvatarUrl());
                 updated = true;
             }
+            if (!StringUtils.equals(userData.getRole(), newUser.getRole())) {
+                userData.setRole(newUser.getRole());
+                updated = true;
+            }
             if (updated) {
                 cache.evictExtensionJsons(userData);
             }

@@ -27,11 +27,23 @@ public class LdapAuthenticationSuccessHandler implements AuthenticationSuccessHa
     private final String redirectUrl;
     private final org.eclipse.openvsx.UserService userService;
     private final org.springframework.ldap.core.LdapTemplate ldapTemplate;
+    private final String userSearchBase;
+    private final String groupSearchBase;
+    private final String groupSearchFilter;
+    private final String adminGroups;
+    private final String ldapBase;
 
-    public LdapAuthenticationSuccessHandler(String redirectUrl, org.eclipse.openvsx.UserService userService, org.springframework.ldap.core.LdapTemplate ldapTemplate) {
+    public LdapAuthenticationSuccessHandler(String redirectUrl, org.eclipse.openvsx.UserService userService, 
+                                          org.springframework.ldap.core.LdapTemplate ldapTemplate,
+                                          String userSearchBase, String groupSearchBase, String groupSearchFilter, String adminGroups, String ldapBase) {
         this.redirectUrl = redirectUrl;
         this.userService = userService;
         this.ldapTemplate = ldapTemplate;
+        this.userSearchBase = userSearchBase;
+        this.groupSearchBase = groupSearchBase;
+        this.groupSearchFilter = groupSearchFilter;
+        this.adminGroups = adminGroups;
+        this.ldapBase = ldapBase;
     }
 
     @Override
@@ -68,7 +80,7 @@ public class LdapAuthenticationSuccessHandler implements AuthenticationSuccessHa
                 searchControls.setReturningAttributes(new String[]{"displayName", "givenName", "sn", "cn", "mail", "email"});
                 
                 var results = ldapTemplate.search(
-                    "ou=users", 
+                    userSearchBase, 
                     "(uid=" + username + ")", 
                     searchControls,
                     (org.springframework.ldap.core.AttributesMapper<String[]>) attrs -> {
@@ -105,6 +117,9 @@ public class LdapAuthenticationSuccessHandler implements AuthenticationSuccessHa
                 logger.warn("Could not query LDAP for user attributes: " + e.getMessage());
             }
             
+            // Query LDAP groups for role assignment
+            String role = determineUserRole(username);
+            
             // Create user data for LDAP user
             var userData = new org.eclipse.openvsx.entities.UserData();
             userData.setLoginName(username);
@@ -112,16 +127,24 @@ public class LdapAuthenticationSuccessHandler implements AuthenticationSuccessHa
             userData.setAuthId("ldap:" + username);
             userData.setFullName(fullName);
             userData.setEmail(email);
+            userData.setRole(role);
             
             // Save user to database
             userData = userService.upsertUser(userData);
             
+            // Create authorities based on user role
+            var authorities = new java.util.ArrayList<org.springframework.security.core.GrantedAuthority>();
+            if (org.eclipse.openvsx.entities.UserData.ROLE_ADMIN.equals(role)) {
+                authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"));
+            }
+            authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"));
+            
             // Create IdPrincipal
-            var idPrincipal = new IdPrincipal(userData.getId(), username, new java.util.ArrayList<>(authentication.getAuthorities()));
+            var idPrincipal = new IdPrincipal(userData.getId(), username, authorities);
             
             // Update the authentication with IdPrincipal
             var newAuth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                idPrincipal, authentication.getCredentials(), authentication.getAuthorities());
+                idPrincipal, authentication.getCredentials(), authorities);
             org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(newAuth);
             
             logger.info("User session created for: " + username);
@@ -134,5 +157,42 @@ public class LdapAuthenticationSuccessHandler implements AuthenticationSuccessHa
         response.setContentType("application/json");
         response.setStatus(200);
         response.getWriter().write("{\"success\":true}");
+    }
+    
+    private String determineUserRole(String username) {
+        try {
+            // Search for groups the user belongs to
+            var searchControls = new javax.naming.directory.SearchControls();
+            searchControls.setSearchScope(javax.naming.directory.SearchControls.SUBTREE_SCOPE);
+            searchControls.setReturningAttributes(new String[]{"cn"});
+            
+            String filter = groupSearchFilter.replace("{0}", username)
+                                              .replace("{1}", userSearchBase)
+                                              .replace("{2}", ldapBase);
+            
+            var groups = ldapTemplate.search(
+                groupSearchBase,
+                filter,
+                searchControls,
+                (org.springframework.ldap.core.AttributesMapper<String>) attrs -> {
+                    return attrs.get("cn") != null ? (String) attrs.get("cn").get() : null;
+                });
+            
+            // Check for admin groups first
+            var adminGroupList = java.util.Arrays.asList(adminGroups.split(","));
+            for (String adminGroup : adminGroupList) {
+                if (groups.contains(adminGroup.trim())) {
+                    logger.info("User {} assigned admin role based on group membership: {}", username, adminGroup.trim());
+                    return org.eclipse.openvsx.entities.UserData.ROLE_ADMIN;
+                }
+            }
+            
+            logger.info("User {} assigned privileged role (default)", username);
+            return org.eclipse.openvsx.entities.UserData.ROLE_PRIVILEGED;
+            
+        } catch (Exception e) {
+            logger.warn("Could not query LDAP groups for user {}: {}", username, e.getMessage());
+            return org.eclipse.openvsx.entities.UserData.ROLE_PRIVILEGED; // default role
+        }
     }
 }
