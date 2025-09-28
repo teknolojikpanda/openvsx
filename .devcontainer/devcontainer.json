@@ -5,6 +5,7 @@
     "ghcr.io/devcontainers/features/java:1": {
       "version": "21",
       "installGradle": true
-    }
+    },
+    "ghcr.io/devcontainers/features/node:1": {}
   }
 }
