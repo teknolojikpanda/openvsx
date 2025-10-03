@@ -14,7 +14,7 @@ import { LdapLoginForm } from '../components/LdapLoginForm';
 
 export const LoginComponent: FunctionComponent<LoginComponentProps> = ({ loginProviders, renderButton }) => {
     const [open, setOpen] = useState(false);
-    const { token: csrfToken, error: csrfError } = useCsrfToken();
+    useCsrfToken(); // Keep for compatibility
 
     const providers = Object.keys(loginProviders);
     const hasLdap = providers.indexOf('ldap') !== -1;

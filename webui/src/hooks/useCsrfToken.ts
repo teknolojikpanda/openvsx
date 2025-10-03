@@ -7,7 +7,6 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  * ****************************************************************************** */
-import { useState, useEffect } from 'react';
 
 export function useCsrfToken() {
     return { token: '', loading: false, error: '' };
