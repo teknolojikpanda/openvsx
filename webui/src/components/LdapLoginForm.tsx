@@ -26,7 +26,6 @@ export const LdapLoginForm: React.FC<Props> = ({ csrfToken, onSuccess }) => {
         const formData = new FormData();
         formData.append('username', username);
         formData.append('password', password);
-        if (csrfToken) formData.append('_csrf', csrfToken);
 
         try {
             const url = window.location.origin;

@@ -36,14 +36,10 @@ export const LoginComponent: FunctionComponent<LoginComponentProps> = ({ loginPr
                 <DialogTitle>Log In</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2}>
-                        {csrfError && (
-                            <div style={{ color: 'red', marginBottom: '1em' }}>
-                                {csrfError}
-                            </div>
-                        )}
+
                         {hasLdap && (
                             <LdapLoginForm
-                                csrfToken={csrfToken}
+                                csrfToken=""
                                 onSuccess={onSuccess}
                             />
                         )}

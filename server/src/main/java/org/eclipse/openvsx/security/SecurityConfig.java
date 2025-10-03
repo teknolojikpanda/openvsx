@@ -107,7 +107,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, OAuth2UserServices userServices) throws Exception {
         var filterChain = http.authorizeHttpRequests(
                 registry -> registry
-                        .requestMatchers(toMatchers("/*", "/login/**", "/oauth2/**", "/login-providers", "/user", "/user/auth-error", "/logout", "/actuator/health/**", "/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus", "/v3/api-docs/**", "/swagger-resources/**", "/swagger-ui/**", "/webjars/**"))
+                        .requestMatchers(toMatchers("/*", "/login/**", "/oauth2/**", "/login-providers", "/user", "/user/auth-error", "/user/csrf", "/logout", "/actuator/health/**", "/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus", "/v3/api-docs/**", "/swagger-resources/**", "/swagger-ui/**", "/webjars/**"))
                             .permitAll()
                         .requestMatchers(toMatchers("/api/*/*/review", "/api/*/*/review/delete", "/api/user/publish", "/api/user/namespace/create"))
                             .authenticated()
@@ -121,7 +121,7 @@ public class SecurityConfig {
                             .authenticated()
                 )
                 .cors(org.springframework.security.config.Customizer.withDefaults())
-                .csrf(configurer -> configurer.ignoringRequestMatchers(toMatchers("/api/-/publish", "/api/-/namespace/create", "/api/-/query", "/vscode/**", "/admin/api/**", "/login")))
+                .csrf(configurer -> configurer.disable())
                 .exceptionHandling(configurer -> configurer.authenticationEntryPoint(new Http403ForbiddenEntryPoint()));
 
         if (ldapConfig != null && ldapConfig.isLdapEnabled()) {

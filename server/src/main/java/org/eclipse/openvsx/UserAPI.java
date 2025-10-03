@@ -136,11 +136,16 @@ public class UserAPI {
         path = "/user/csrf",
         produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public CsrfTokenJson getCsrfToken(HttpServletRequest request) {
+    public ResponseEntity<?> getCsrfToken(HttpServletRequest request) {
         var csrfToken = (CsrfToken) request.getAttribute("_csrf");
-        return csrfToken != null
-                ? new CsrfTokenJson(csrfToken.getToken(), csrfToken.getHeaderName())
-                : CsrfTokenJson.error("Token is not available.");
+        if (csrfToken != null) {
+            var response = new java.util.HashMap<String, String>();
+            response.put("token", csrfToken.getToken());
+            response.put("header", csrfToken.getHeaderName());
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.ok(java.util.Map.of("error", "Token is not available."));
+        }
     }
 
     @GetMapping(

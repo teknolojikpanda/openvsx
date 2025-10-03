@@ -92,6 +92,7 @@ org:
 
 bucket4j:
   enabled: true
+  cache-to-use: redis-jedis # use redis-cluster-jedis when running redis cluster
   filters:
     - cache-name: buckets
       url: '/api/-/(namespace/create|publish)'
@@ -138,6 +139,8 @@ ovsx:
   elasticsearch:
     clear-on-start: true
     host: ${ELASTICSEARCH_HOST:elasticsearch:9200}
+  redis:
+    embedded: true
   extension-control:
     update-on-start: true
   integrity:
