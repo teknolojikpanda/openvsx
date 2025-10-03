@@ -10,37 +10,5 @@
 import { useState, useEffect } from 'react';
 
 export function useCsrfToken() {
-    const [token, setToken] = useState<string>('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string>('');
-
-    useEffect(() => {
-        const url = window.location.origin;
-
-        async function fetchToken(opts?: RequestInit) {
-            try {
-                const res = await fetch(`${url}/user/csrf`, opts);
-                const body = await res.json();
-                if (body.token) {
-                    setToken(body.token);
-                    setError('');
-                } else {
-                    setError('Failed to retrieve CSRF token from server.');
-                }
-                setLoading(false);
-            } catch (err) {
-                if (!opts?.credentials) {
-                    // Try with credentials for cross-origin request
-                    fetchToken({ credentials: 'include' });
-                } else {
-                    setError('Unable to fetch CSRF token. Please try again later.');
-                    setLoading(false);
-                }
-            }
-        }
-
-        fetchToken();
-    }, []);
-
-    return { token, loading, error };
+    return { token: '', loading: false, error: '' };
 }
