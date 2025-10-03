@@ -39,7 +39,7 @@ export const LoginComponent: FunctionComponent<LoginComponentProps> = ({ loginPr
 
                         {hasLdap && (
                             <LdapLoginForm
-                                csrfToken=""
+                                csrfToken=''
                                 onSuccess={onSuccess}
                             />
                         )}
